@@ -1,19 +1,26 @@
 """Build an allowlisted submission archive; no keys, models or data included."""
 import hashlib
+import argparse
 from pathlib import Path
 from zipfile import ZipFile, ZIP_DEFLATED
 
 
 def main():
     root = Path(__file__).resolve().parent
-    names = ("solution.py", "research.py", "requirements.txt")
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--output", type=Path, default=root / "outputs" / "automl_submission.zip",
+                        help="New archive path; existing archives are never overwritten")
+    args = parser.parse_args()
+    names = ("solution.py", "research.py", "xgb_backend.py", "diagnostics.py", "requirements.txt")
     for name in names:
         path = root / name
         if not path.is_file() or not path.stat().st_size:
             raise ValueError(f"Missing or empty file: {name}")
         if path.suffix == ".py":
             compile(path.read_text(encoding="utf-8-sig"), name, "exec")
-    destination = root / "outputs" / "automl_submission.zip"
+    destination = args.output.resolve()
+    if destination.exists():
+        raise FileExistsError("Archive already exists; choose a new name with --output")
     destination.parent.mkdir(exist_ok=True)
     temporary = destination.with_suffix(".tmp")
     with ZipFile(temporary, "w", compression=ZIP_DEFLATED) as archive:

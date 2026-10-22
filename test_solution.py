@@ -1,9 +1,12 @@
 """Offline checks: python -m unittest -v"""
 import tempfile
 import unittest
+import json
+from types import SimpleNamespace
+from unittest.mock import Mock
 from pathlib import Path
 
-from solution import discover_files, run_python, validate_submission
+from solution import discover_files, run_python, validate_submission, review_experiments, reviewer_context
 
 
 class AgentTests(unittest.TestCase):
@@ -50,6 +53,64 @@ class AgentTests(unittest.TestCase):
         self.assertIn("test error", result["stderr"])
         result = run_python("import time; time.sleep(10)", self.root, self.root, 3, 0.2)
         self.assertEqual(result["exit_code"], -1)
+
+    def test_reviewer_retries_empty_and_truncated_responses(self):
+        for content in (None, "   ", "Незавершённая проверка"):
+            with self.subTest(content=content):
+                client = Mock()
+                def response(text, reason):
+                    return SimpleNamespace(usage=None, choices=[SimpleNamespace(
+                        message=SimpleNamespace(content=text), finish_reason=reason)])
+                create = client.chat.completions.create
+                create.side_effect = [response(content, "length"), response("Проверь категории.", "stop")]
+                self.assertEqual(review_experiments(client, self.root, "Задача", 200), "Проверь категории.")
+                self.assertEqual([c.kwargs["max_tokens"] for c in create.call_args_list], [8000, 12000])
+                self.assertEqual(create.call_args_list[0].kwargs["reasoning_effort"], "none")
+                self.assertNotIn("reasoning_effort", create.call_args_list[1].kwargs)
+                logs = [json.loads(s) for s in (self.root / "reviews.jsonl").read_text(encoding="utf-8").splitlines()]
+                self.assertEqual(logs[-2]["status"], "invalid_response")
+                self.assertEqual(logs[-2]["finish_reason"], "length")
+                self.assertEqual(logs[-1]["status"], "ok")
+
+    def test_reviewer_failure_is_not_feedback(self):
+        client = Mock()
+        create = client.chat.completions.create
+        create.return_value = SimpleNamespace(usage=None, choices=[])
+        with self.assertRaisesRegex(RuntimeError, "Проверка не выполнена"):
+            review_experiments(client, self.root, "Задача", 200)
+        self.assertEqual(create.call_count, 2)
+        create.reset_mock()
+        with self.assertRaisesRegex(RuntimeError, "Недостаточно времени"):
+            review_experiments(client, self.root, "Задача", 0)
+        create.assert_not_called()
+
+    def test_reviewer_recovers_from_api_error(self):
+        client = Mock()
+        client.chat.completions.create.side_effect = [TimeoutError("secret"), SimpleNamespace(
+            usage=None, choices=[SimpleNamespace(message=SimpleNamespace(content="Замечание"), finish_reason="stop")])]
+        self.assertEqual(review_experiments(client, self.root, "Задача", 200), "Замечание")
+        log = (self.root / "reviews.jsonl").read_text(encoding="utf-8")
+        self.assertNotIn("secret", log)
+        self.assertIn("TimeoutError", log)
+
+    def test_reviewer_context_keeps_best_members_and_limits_history(self):
+        root = self.root / "research"
+        root.mkdir()
+        experiments = [{"id": i, "algorithm": "lightgbm", "params": {}, "score": float(i),
+                        "feature_code": "def transform(X): return X", "hypothesis": "x" * 5000}
+                       for i in range(1, 201)]
+        experiments[99]["feature_code"] = "def _h(s): return s.encode().hex()[:14]"
+        best = {"id": 201, "algorithm": "ensemble", "params": {"ids": [1, 100, 101]}, "score": .5}
+        experiments.append(best)
+        (root / "state.json").write_text(json.dumps({"metric": "rmse", "experiments": experiments,
+                                                     "best": best}), encoding="utf-8")
+        text = reviewer_context(self.root, "task" * 10000)
+        context = json.loads(text)
+        self.assertLess(len(text), 18000)
+        self.assertEqual(context["experiment_count"], 201)
+        self.assertIn("100", context["best_feature_code"])
+        self.assertTrue(context["controller_warnings"])
+        self.assertLessEqual(len(context["selected_experiments"]), 13)
 
 
 if __name__ == "__main__":
