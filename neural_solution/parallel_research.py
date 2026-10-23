@@ -60,18 +60,20 @@ def recipe_key(args):
                        args.get('feature_code', ''), args.get('early_stopping_rounds', 50)], sort_keys=True)
 
 
-def run_batch(calls, folder, files, log_dir, timeout, jobs=2):
+def run_batch(calls, folder, files, log_dir, timeout, jobs=2, backend='xgb_backend', total_threads=8):
     """Wait for a bounded batch, then commit successes serially in proposal order."""
     from research import write_json
     root = log_dir / 'research'
     state = json.loads((root / 'state.json').read_text(encoding='utf-8'))
     results, pending = {}, []
     seen = {recipe_key(e) for e in state['experiments'] if e['algorithm'] != 'ensemble'}
-    jobs = min(jobs, 2)
+    if backend not in {'xgb_backend', 'torch_backend'} or not 1 <= total_threads <= 8:
+        raise ValueError('Unsupported worker backend or CPU allocation')
+    jobs = min(jobs, 2, total_threads)
     # Conservative admission check, not an OS-enforced memory limit.
     if jobs == 2 and available_memory() < 8 * 1024**3:
         jobs = 1
-    threads = max(1, min(8, os.cpu_count() or 1) // jobs)
+    threads = max(1, min(total_threads, os.cpu_count() or 1) // jobs)
     print(f'Training queue: {len(calls)} proposals, up to {jobs} processes, {threads} CPU threads each', flush=True)
     deadline = time.monotonic() + timeout
     for call in calls:
@@ -87,7 +89,7 @@ def run_batch(calls, folder, files, log_dir, timeout, jobs=2):
             write_json(directory / 'state.json', state)
             shutil.copy2(root / 'split.npz', directory / 'split.npz')
             request = dict(root=str(directory), folder=str(folder), files={k: str(v) for k, v in files.items()},
-                           arguments=args, threads=threads)
+                           arguments=args, threads=threads, backend=backend)
             write_json(directory / 'request.json', request)
             pending.append((call, directory, args, role))
         except (ValueError, TypeError, KeyError, StopIteration) as error:
@@ -97,7 +99,9 @@ def run_batch(calls, folder, files, log_dir, timeout, jobs=2):
         call, directory, args, role = item
         env = {k: v for k, v in os.environ.items()
                if not any(w in k.upper() for w in ('KEY', 'TOKEN', 'SECRET', 'PASSWORD'))}
-        env.update({k: str(threads) for k in ('OMP_NUM_THREADS', 'MKL_NUM_THREADS', 'OPENBLAS_NUM_THREADS')})
+        env.update({k: str(threads) for k in ('OMP_NUM_THREADS', 'MKL_NUM_THREADS', 'OPENBLAS_NUM_THREADS',
+                                            'NUMEXPR_NUM_THREADS', 'BLIS_NUM_THREADS', 'VECLIB_MAXIMUM_THREADS')})
+        env.update(AUTOML_CPU_THREADS=str(threads), AUTOML_WORKER_DEADLINE=str(time.time()+max(0, deadline-time.monotonic()-3)))
         started = time.monotonic()
         with (directory / 'stdout.txt').open('w', encoding='utf-8') as out, (directory / 'stderr.txt').open('w', encoding='utf-8') as err:
             try:
@@ -137,6 +141,7 @@ def run_batch(calls, folder, files, log_dir, timeout, jobs=2):
                     state['experiments'].append(record)
                     if improved:
                         state['best'] = record
+                        state['finalized'] = False
                     write_json(root / 'state.json', state)
                     result.update(experiment=record, improved=improved, published=False)
                 except (OSError, ValueError, KeyError) as error:
@@ -151,7 +156,12 @@ def worker(request):
     # Resource overrides are process-local; saved bundles retain standard model classes.
     from unittest.mock import patch
     import xgboost as xgb
-    from xgb_backend import ExtendedResearch
+    if request.get('backend') == 'torch_backend':
+        from torch_resources import configure
+        configure(request['threads'])
+        from torch_backend import TorchResearch as ExtendedResearch
+    else:
+        from xgb_backend import ExtendedResearch
     from research import write_json
     threads = request['threads']
     original_matrix, original_train = xgb.DMatrix, xgb.train

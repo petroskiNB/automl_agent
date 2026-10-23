@@ -94,7 +94,7 @@ class Research:
         write_json(self.root / "state.json", state)
         return state
 
-    def prepare(self, frame, state, feature_code=""):
+    def prepare(self, frame, state, feature_code="", preserve_categorical_missing=False):
         x = frame[state["features"]].copy()
         if feature_code:
             tree = ast.parse(feature_code)
@@ -124,7 +124,8 @@ class Research:
                 raise ValueError("Only row-wise transformations are supported; batch-dependent features rejected") from error
         cats = [c for c in x if not pd.api.types.is_numeric_dtype(x[c])]
         for c in cats:
-            x[c] = x[c].fillna("__MISSING__").astype(str)
+            if not preserve_categorical_missing:
+                x[c] = x[c].fillna("__MISSING__").astype(str)
         for c in x.columns.difference(cats):
             x[c] = x[c].replace([np.inf, -np.inf], np.nan)
         return x, cats

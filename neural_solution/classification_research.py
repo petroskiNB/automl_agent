@@ -49,6 +49,8 @@ def fit_decision_rule(probabilities, y, classes):
 
 
 class ClassificationResearch:
+    supported_algorithms = {"catboost", "lightgbm", "xgboost"}
+
     def __init__(self, root, files, folder):
         self.engine = ExtendedResearch(root, files, folder)
         self.run, self.folder = Path(root).parent, Path(folder)
@@ -95,6 +97,9 @@ class ClassificationResearch:
             model.fit(x, y, eval_set=[(xv, yv)], eval_metric=metric,
                       callbacks=[early_stopping(30, first_metric_only=True, verbose=False)])
             selected = model.best_iteration_ or model.n_estimators_
+        elif algorithm in {"torch_mlp", "torch_resnet"} and hasattr(self.engine, "_fit"):
+            self.engine._fit(model, algorithm, state, x, y, cats, xv, yv, patience=10)
+            selected = model.selected_iterations
         else:
             raise ValueError("Unsupported base model")
         bundle = dict(model=model, algorithm=algorithm, levels=levels, feature_code=code,
@@ -133,8 +138,10 @@ class ClassificationResearch:
         for i, (tr, va) in enumerate(StratifiedKFold(3, shuffle=True, random_state=42).split(data, origin)):
             x, cats = self.engine.prepare(data.iloc[tr], state)
             xv, _ = self.engine.prepare(data.iloc[va], state)
-            model = CatBoostClassifier(iterations=120, depth=4, learning_rate=.08,
-                thread_count=8, random_seed=42, verbose=False, allow_writing_files=False)
+            x, levels = self.engine.encode(x, cats, "catboost")
+            xv, _ = self.engine.encode(xv, cats, "catboost", levels)
+            model = self.engine.model(dict(state, metric="accuracy"),
+                dict(iterations=120, depth=4, learning_rate=.08), "catboost")
             model.fit(x, origin[tr], cat_features=cats)
             probabilities[va] = model.predict_proba(xv)[:, 1]
             scores.append(float(roc_auc_score(origin[va], probabilities[va])))
@@ -182,7 +189,7 @@ class ClassificationResearch:
         recipes = []
         for eid in experiment_ids:
             recipe = next((e for e in full["experiments"] if e["id"] == eid), None)
-            if not recipe or recipe["algorithm"] not in {"catboost", "lightgbm", "xgboost"}:
+            if not recipe or recipe["algorithm"] not in self.supported_algorithms:
                 raise ValueError("Select saved single-model recipes")
             recipes.append({k: recipe[k] for k in ("id", "algorithm", "params", "feature_code")})
         config = dict(task=state, recipes=recipes, folds=folds, seed=42, shift_id=shift_id,
