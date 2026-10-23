@@ -11,7 +11,8 @@ def main():
     parser.add_argument("--output", type=Path, default=root / "outputs" / "automl_submission.zip",
                         help="New archive path; existing archives are never overwritten")
     args = parser.parse_args()
-    names = ("solution.py", "research.py", "xgb_backend.py", "diagnostics.py", "requirements.txt")
+    names = ("solution.py", "research.py", "xgb_backend.py", "diagnostics.py", "temporal_research.py",
+             "classification_research.py", "classification_checks.py", "final_output.py", "research_team.py", "parallel_research.py", "requirements.txt")
     for name in names:
         path = root / name
         if not path.is_file() or not path.stat().st_size:

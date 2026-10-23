@@ -1,0 +1,5 @@
+{
+  "positive_flags": ["pos_sttl", "pos_dttl", "pos_sinpkt", "pos_dinpkt", "pos_synack"],
+  "ttl": ["ttldom_decay"],
+  "application": ["has_http_mthd", "has_ftp_cmd"]
+}

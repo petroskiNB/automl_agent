@@ -22,6 +22,16 @@ from datetime import datetime
 
 
 SYSTEM_PROMPT = """Ты ML-инженер. Реши задачу из сообщения пользователя.
+Для классификации Macro F1 доступны adversarial_validation и run_classification_suite.
+Сначала создай 2 разных одиночных рецепта, затем сравни их на 3 внешних фолдах.
+Веса ансамбля и множители классов выбираются на внутренней проверке; внешний
+фолд не участвует в настройке. shift_id из adversarial_validation добавляет
+диагностическую test-like проверку, она не считается скрытым тестом.
+После завершённого сравнения явно вызови select_final_candidate(kind="classification_oof",
+suite_id=...). Для временного исследования можно выбрать kind="temporal".
+Тогда финализатор опубликует весь выбранный pipeline в основной submission.csv.
+Не сравнивай значения разных схем проверки напрямую. Выбор трека — явное решение.
+Не заявляй статистическую значимость без оценки. Весь бюджет общий для агентов.
 Используй inspect_data, затем configure_task, затем train_model для экспериментов.
 Доступные алгоритмы: catboost, lightgbm, xgboost. При наличии XGBoost проверь его
 после базовой модели и до длительного подбора весов ансамблей. XGBoost использует
@@ -73,6 +83,14 @@ train, неизвестные значения validation/test обрабаты�
 Повтор опыта с большим iterations не нужен, если early stopping уже остановил
 обучение значительно раньше прежнего лимита.
 Для чтения полного кода и результатов старого опыта используй read_experiment.
+Для временной регрессии RMSE доступен run_temporal_suite: один сохранённый
+CatBoost-рецепт проверяется без истории, с точной историей ключа и с групповым
+fallback на 2–5 периодах. История только из строго прошлых лет, число деревьев
+выбирается внутри обучающей части каждого периода. Ключи — гипотеза, не ID здания.
+Результаты отдельные: не сравнивай mean_rmse с прежним single-holdout score.
+finalize_temporal сохраняет отдельный кандидат в temporal/<suite_id>/submission.csv;
+он НЕ заменяет основной submission.csv и не меняет старый best.
+Не запускай большой temporal suite близко к дедлайну: он требует нескольких обучений.
 После базовых экспериментов и при остановке прогресса вызывай analyze_errors:
 он показывает путаницу классов, уверенность, ошибки регрессии и группы признаков.
 compare_errors сравнивает ошибки двух моделей на одинаковой валидации перед ансамблем.
@@ -123,6 +141,34 @@ def tool_schema(name, description, properties, required=()):
 
 
 TOOLS += [
+    tool_schema("reblend_suite", "Re-evaluate 2..3 saved suite recipes with pair subsets; reuse models, fit rules on inner calibration only", {
+        "source_suite_id": {"type": "string"}, "experiment_ids": {"type": "array", "items": {"type": "integer"}, "minItems": 2, "maxItems": 3}}, ["source_suite_id", "experiment_ids"]),
+    tool_schema("stress_errors", "Compare two recipes on identical stress rows; full class/group report saved on disk", {
+        "suite_id": {"type": "string"}, "experiment_ids": {"type": "array", "items": {"type": "integer"}, "minItems": 2, "maxItems": 2}}, ["suite_id", "experiment_ids"]),
+    tool_schema("grouped_validation", "Diagnostic outer CV with identical feature rows grouped together; no publication", {
+        "experiment_ids": {"type": "array", "items": {"type": "integer"}, "minItems": 1, "maxItems": 3},
+        "folds": {"type": "integer", "minimum": 3, "maximum": 5}}, ["experiment_ids"]),
+    tool_schema("stress_ablation", "Keep one group of derived columns at a time, refit on stress train; diagnostic only", {
+        "suite_id": {"type": "string"}, "experiment_id": {"type": "integer"},
+        "feature_groups": {"type": "object", "additionalProperties": {"type": "array", "items": {"type": "string"}}}}, ["suite_id", "experiment_id", "feature_groups"]),
+    tool_schema("adversarial_validation", "OOF train/test discrimination excluding IDs and target; creates optional stress split", {}),
+    tool_schema("run_classification_suite", "Nested classification OOF: base models, equal/learned ensemble, Macro F1 decision rule; outer folds never tune rules", {
+        "experiment_ids": {"type": "array", "items": {"type": "integer", "minimum": 1}, "minItems": 2, "maxItems": 3},
+        "folds": {"type": "integer", "minimum": 3, "maximum": 5},
+        "shift_id": {"type": "string"}}, ["experiment_ids"]),
+    tool_schema("select_final_candidate", "Select a completed validation track for final publication, replacing legacy holdout selection; no metric mixing", {
+        "kind": {"type": "string", "enum": ["classification_oof", "temporal"]},
+        "suite_id": {"type": "string"}}, ["kind", "suite_id"]),
+    tool_schema("run_temporal_suite", "Compare a saved CatBoost recipe across frozen temporal folds, baseline/exact-history/group-history; separate results, no publishing", {
+        "history_gate": {"type": "boolean", "description": "Also evaluate fixed routing: historical model for keys with past observations, baseline otherwise"},
+        "base_experiment_id": {"type": "integer", "minimum": 1},
+        "time_column": {"type": "string"},
+        "key_columns": {"type": "array", "items": {"type": "string"}, "minItems": 1, "maxItems": 8},
+        "group_columns": {"type": "array", "items": {"type": "string"}, "minItems": 1, "maxItems": 8},
+        "validation_periods": {"type": "array", "items": {"type": "number"}, "minItems": 2, "maxItems": 5}
+    }, ["base_experiment_id", "time_column", "key_columns", "group_columns", "validation_periods"]),
+    tool_schema("finalize_temporal", "Refit selected temporal candidate and export separate model/submission without replacing task submission", {
+        "suite_id": {"type": "string"}}, ["suite_id"]),
     tool_schema("analyze_errors", "Analyze saved holdout predictions: class confusions, confidence, residuals and feature groups. No training.", {
         "experiment_id": {"type": "integer", "minimum": 1},
         "group_columns": {"type": "array", "items": {"type": "string"}, "maxItems": 3},
@@ -137,6 +183,7 @@ TOOLS += [
         "split": {"type": "string", "enum": ["random", "time", "group"]},
         "split_column": {"type": "string"}}, ["target", "task_type", "metric", "split"]),
     tool_schema("train_model", "Run and score a model on the frozen split; automatically save winner", {
+        "base_experiment_id": {"type": "integer", "minimum": 1, "description": "Inherit single-model recipe; params override it. Feature branch must also provide changed feature_code."},
         "hypothesis": {"type": "string"},
         "algorithm": {"type": "string", "enum": ["catboost", "lightgbm", "xgboost"]},
         "feature_code": {"type": "string"},
@@ -155,8 +202,8 @@ TOOLS += [
             "colsample_bytree": {"type": "number", "exclusiveMinimum": 0, "maximum": 1},
             "reg_alpha": {"type": "number", "minimum": 0},
             "gamma": {"type": "number", "minimum": 0},
-            "auto_class_weights": {"type": "string", "enum": ["Balanced", "SqrtBalanced"]}
-        }, "additionalProperties": False}}, ["hypothesis", "algorithm", "params"]),
+            "auto_class_weights": {"type": ["string", "null"], "enum": ["Balanced", "SqrtBalanced", None]}
+        }, "additionalProperties": False}}, ["hypothesis"]),
 ]
 TOOLS.append(tool_schema("blend_models", "Evaluate an ensemble on the frozen validation split", {
     "experiment_ids": {"type": "array", "items": {"type": "integer"}, "minItems": 2, "maxItems": 3},
@@ -231,6 +278,13 @@ def experiment_memory(log_dir):
                 continue
     memory = {"task": {k: state.get(k) for k in ("target", "metric", "split", "split_column")},
               "experiments": rows, "best": best, "best_feature_code": codes, "recent_failures": errors[-5:]}
+    temporal = log_dir / "temporal_summary.json"
+    if temporal.exists():
+        memory["temporal_comparison"] = json.loads(temporal.read_text(encoding="utf-8"))
+    for name in ("classification_summary", "classification_checks_summary", "grouped_validation_summary", "stress_ablation_summary", "adversarial_summary", "final_selection"):
+        path = log_dir / (name + ".json")
+        if path.exists():
+            memory[name] = json.loads(path.read_text(encoding="utf-8"))
     diagnostics = log_dir / "diagnostics.json"
     analysis = log_dir / "error_analysis.json"
     if analysis.exists():
@@ -283,6 +337,13 @@ def reviewer_context(log_dir, task):
     analysis = log_dir / "error_analysis.json"
     if analysis.exists():
         payload["error_analysis"] = json.loads(analysis.read_text(encoding="utf-8"))[-3:]
+    temporal = log_dir / "temporal_summary.json"
+    if temporal.exists():
+        payload["temporal_comparison"] = json.loads(temporal.read_text(encoding="utf-8"))
+    for name in ("classification_summary", "classification_checks_summary", "grouped_validation_summary", "stress_ablation_summary", "adversarial_summary", "final_selection"):
+        path = log_dir / (name + ".json")
+        if path.exists():
+            payload[name] = json.loads(path.read_text(encoding="utf-8"))
     if diagnostics.exists():
         payload["secondary_checks"] = json.loads(diagnostics.read_text(encoding="utf-8"))[-3:]
     return json.dumps(payload, ensure_ascii=False)
@@ -363,6 +424,14 @@ def run_research(action, arguments, folder, files, log_dir, step, timeout, modul
     code = (f"import runpy, sys\nsys.path.insert(0, {str(Path(module).parent)!r})\n"
             f"sys.argv = [{module!r}, {str(request_path)!r}]\nrunpy.run_path({module!r}, run_name='__main__')")
     result = run_python(code, folder, log_dir, step, timeout)
+    if result.get("exit_code") == -1:
+        # subprocess.run has killed and reaped the timed-out worker. Only the
+        # controller owning this task may release its abandoned worker lock.
+        task_lock = folder / ".agent.lock"
+        if task_lock.exists() and task_lock.read_text().strip() == str(os.getpid()):
+            abandoned = {"classification_research.py": ".classification.lock", "temporal_research.py": ".temporal.lock"}.get(module_name)
+            if abandoned:
+                (log_dir / abandoned).unlink(missing_ok=True)
     with (log_dir / "events.jsonl").open("a", encoding="utf-8") as stream:
         stream.write(json.dumps({"action": action, "arguments": arguments, "result": result}, ensure_ascii=False) + "\n")
     return result
@@ -533,6 +602,8 @@ def _run_agent(args, folder, files):
     log_dir.mkdir(parents=True, exist_ok=bool(resume))
     (log_dir / "manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
     session_id = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+    if getattr(args, "new_selection", False) and (log_dir / "final_selection.json").exists():
+        (log_dir / "final_selection.json").replace(log_dir / f"final_selection_before_{session_id}.json")
     if (log_dir / "conversation.json").exists():
         shutil.copy2(log_dir / "conversation.json", log_dir / f"conversation_before_{session_id}.json")
     # An old result must not be mistaken for success of this run.
@@ -551,6 +622,7 @@ def _run_agent(args, folder, files):
                          "Изучи память; продолжи с лучшего результата, избегай повторов:\n" +
                          json.dumps(experiment_memory(log_dir), ensure_ascii=False)})
     instructions = getattr(args, "instructions", None)
+    guidance = ""
     if instructions:
         guidance = Path(instructions).read_text(encoding="utf-8-sig")
         messages.append({"role": "user", "content": "План текущего исследования от пользователя:\n" + guidance})
@@ -564,7 +636,7 @@ def _run_agent(args, folder, files):
     reserve = min(args.final_reserve, args.time_budget * .3)
     research_deadline = deadline - reserve
     api_failures = 0
-    with OpenAI(max_retries=0) as client, ThreadPoolExecutor(max_workers=2) as pool:
+    with OpenAI(max_retries=0) as client, ThreadPoolExecutor(max_workers=5) as pool:
         roles = (["reviewer"] if reviewer else []) + (["analyst"] if getattr(args, "analyst", False) else [])
         advisors = Advisors(pool, client, log_dir, task, roles)
         for step in range(1, args.max_steps + 1):
@@ -594,24 +666,36 @@ def _run_agent(args, folder, files):
                 f"Доступность LightGBM: {bool(importlib.util.find_spec('lightgbm'))}; "
                 f"XGBoost: {bool(importlib.util.find_spec('xgboost'))}."})
             try:
-                response = client.chat.completions.create(
-                    model=os.getenv("OPENAI_MODEL", "qwen/qwen3.8-27b"),
-                    messages=messages, tools=TOOLS, parallel_tool_calls=False,
-                    timeout=min(90, remaining), max_tokens=8000,
-                )
+                if getattr(args, "researchers", 1) >= 2 and count:
+                    from research_team import propose_round
+                    snapshot = json.loads(reviewer_context(log_dir, task))
+                    snapshot["completed_recipes"] = [{k: e[k] for k in ("id", "algorithm", "params", "score") if k in e}
+                                                      | {"feature_hash": hashlib.sha256(e.get("feature_code", "").encode()).hexdigest()[:16]}
+                                                      for e in state["experiments"]]
+                    message = propose_round(client, pool, os.getenv("OPENAI_MODEL", "qwen/qwen3.8-27b"),
+                        SYSTEM_PROMPT, task, guidance, snapshot, messages[-8:], TOOLS, remaining,
+                        step, log_dir, record_usage, researchers=args.researchers, sequential=api_failures > 0)
+                else:
+                    response = client.chat.completions.create(
+                        model=os.getenv("OPENAI_MODEL", "qwen/qwen3.8-27b"),
+                        messages=messages, tools=TOOLS, parallel_tool_calls=False,
+                        timeout=min(90, remaining), max_tokens=8000,
+                    )
+                    record_usage(response, log_dir, "researcher")
+                    message = response.choices[0].message
             except Exception as error:
                 # SDK error strings may contain endpoint details: avoid logging credentials.
                 print(f"API request failed: {type(error).__name__}. Checking saved output.", flush=True)
                 api_failures += 1
-                transient = type(error).__name__ in {"APITimeoutError", "APIConnectionError", "InternalServerError"}
+                transient = getattr(error, "retryable", False) or type(error).__name__ in {"APITimeoutError", "APIConnectionError", "InternalServerError", "RateLimitError"}
+                if type(error).__name__ == "ResearchTeamUnavailable":
+                    print(f"Research branch failures: {error}", flush=True)
                 if transient and api_failures <= 2 and research_deadline - time.monotonic() > 100:
-                    print("Retrying transient API failure; experiment state is preserved.", flush=True)
+                    print("Retrying transient API failure; experiment state is preserved. Team retry uses sequential requests (up to 180s each).", flush=True)
                     time.sleep(2)
                     continue
                 break
             api_failures = 0
-            record_usage(response, log_dir, "researcher")
-            message = response.choices[0].message
             messages.append(message.model_dump(exclude_none=True))
             (log_dir / "conversation.json").write_text(
                 json.dumps(messages, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -619,14 +703,23 @@ def _run_agent(args, folder, files):
                 print(message.content, flush=True)
             if not message.tool_calls:
                 state = research_state(log_dir)
-                if state["best"] and len(state["experiments"]) - initial_count >= args.min_experiments:
+                selection_required = getattr(args, "require_selection", False) and not (log_dir / "final_selection.json").exists()
+                if state["best"] and not selection_required and ((log_dir / "final_selection.json").exists() or len(state["experiments"]) - initial_count >= args.min_experiments):
                     if advisors.pending:
                         if advisors.collect(messages, wait=True):
                             continue
                     break
                 messages.append({"role": "user", "content":
+                    "Нужно завершить OOF/временное сравнение и вызвать select_final_candidate." if selection_required else
                     f"Продолжи исследование через инструменты. Нужно хотя бы {args.min_experiments} "
                     "успешных эксперимента, если позволяет время. Не повторяй одинаковые параметры."})
+            training_results = {}
+            training_calls = [c for c in message.tool_calls or [] if c.function.name == "train_model"]
+            if training_calls and count and (getattr(args, "researchers", 1) >= 2 or getattr(args, "training_jobs", 1) > 1):
+                from parallel_research import run_batch
+                training_results = run_batch(training_calls, folder, files, log_dir,
+                    max(.01, min(args.step_timeout, research_deadline - time.monotonic())),
+                    jobs=getattr(args, "training_jobs", 1))
             for call in message.tool_calls or []:
                 call_sequence += 1
                 try:
@@ -634,15 +727,36 @@ def _run_agent(args, folder, files):
                     if not isinstance(arguments, dict):
                         raise ValueError("Tool arguments must be an object")
                     remaining = research_deadline - time.monotonic()
-                    if remaining <= 1:
+                    if call.id in training_results:
+                        result = training_results[call.id]
+                    elif remaining <= 1:
                         result = {"error": "Total time budget exhausted"}
                     elif call.function.name in {"inspect_data", "configure_task", "train_model", "blend_models"}:
                         action = {"inspect_data": "inspect", "configure_task": "configure", "train_model": "train", "blend_models": "blend"}[call.function.name]
+                        if action == "train" and "base_experiment_id" in arguments:
+                            from parallel_research import resolve_recipe
+                            arguments = resolve_recipe(arguments, research_state(log_dir), "models")
                         result = run_research(action, arguments, folder, files, log_dir, call_sequence,
                                               min(args.step_timeout, remaining))
+                    elif call.function.name == "run_python" and getattr(args, "researchers", 1) >= 2 and count:
+                        raise ValueError("Research team uses trusted tools only; direct file/code execution is disabled")
+                    elif call.function.name == "select_final_candidate" and call.id.startswith("team_") and not call.id.endswith("_models"):
+                        raise ValueError("Only the models/evaluation branch selects the final validation track")
                     elif call.function.name == "run_python" and isinstance(arguments.get("code"), str):
                         result = run_python(arguments["code"], folder, log_dir, call_sequence,
                                             min(args.step_timeout, remaining))
+                    elif call.function.name in {"adversarial_validation", "run_classification_suite"}:
+                        result = run_research(call.function.name, arguments, folder, files, log_dir, call_sequence,
+                                              min(args.step_timeout, remaining), module_name="classification_research.py")
+                    elif call.function.name in {"reblend_suite", "stress_errors", "grouped_validation", "stress_ablation"}:
+                        result = run_research(call.function.name, arguments, folder, files, log_dir, call_sequence,
+                                              min(args.step_timeout, remaining), module_name="classification_checks.py")
+                    elif call.function.name == "select_final_candidate":
+                        result = run_research(call.function.name, arguments, folder, files, log_dir, call_sequence,
+                                              min(60, remaining), module_name="final_output.py")
+                    elif call.function.name in {"run_temporal_suite", "finalize_temporal"}:
+                        result = run_research(call.function.name, arguments, folder, files, log_dir, call_sequence,
+                                              min(args.step_timeout, remaining), module_name="temporal_research.py")
                     elif call.function.name in {"read_experiment", "inspect_categories", "validate_experiment", "analyze_errors", "compare_errors"}:
                         result = run_research(call.function.name, arguments, folder, files, log_dir, call_sequence,
                                               min(args.step_timeout, remaining), module_name="diagnostics.py")
@@ -661,10 +775,18 @@ def _run_agent(args, folder, files):
         (log_dir / "conversation.json").write_text(json.dumps(messages, ensure_ascii=False, indent=2), encoding="utf-8")
     state = research_state(log_dir)
     remaining = deadline - time.monotonic()
+    if getattr(args, "require_selection", False) and not (log_dir / "final_selection.json").exists():
+        raise RuntimeError("Required validation-track selection is missing; old output is not a completed OOF result")
     if state["best"] and remaining > 5:
-        print("Final refit of the best recorded experiment", flush=True)
-        result = run_research("finalize", {}, folder, files, log_dir, call_sequence + 1, remaining - 2)
+        selected = (log_dir / "final_selection.json").exists()
+        print("Publish selected validation pipeline" if selected else "Final refit of the best recorded experiment", flush=True)
+        result = run_research("finalize_selected" if selected else "finalize", {}, folder, files, log_dir,
+                              call_sequence + 1, remaining - 2, module_name="final_output.py" if selected else "xgb_backend.py")
         print(json.dumps(result, ensure_ascii=False), flush=True)
+        if selected and result.get("exit_code") != 0:
+            raise RuntimeError("Selected pipeline was not published. Previous submission is not its result; inspect logs.")
+    elif (log_dir / "final_selection.json").exists():
+        raise RuntimeError("No time to publish selected pipeline; previous submission is not its result")
     if not state["best"]:
         raise RuntimeError(f"No trusted experiment completed. Inspect logs: {log_dir}")
     valid, detail = validate_submission(folder, files)
@@ -690,6 +812,14 @@ def main():
     parser.add_argument("--reviewer", action=argparse.BooleanOptionalAction, default=True,
                         help="Independent Qwen review (extra API calls)")
     parser.add_argument("--review-every", type=int, default=6)
+    parser.add_argument("--training-jobs", type=int, choices=[1, 2], default=1,
+                        help="Concurrent isolated train_model processes; suites run exclusively")
+    parser.add_argument("--new-selection", action="store_true",
+                        help="Archive previous final selection and require a fresh decision with --require-selection")
+    parser.add_argument("--researchers", type=int, choices=[1, 2, 3], default=1,
+                        help="Independent Qwen proposal branches; training concurrency is set by --training-jobs")
+    parser.add_argument("--require-selection", action="store_true",
+                        help="Fail explicitly unless an OOF/temporal final candidate is selected and published")
     parser.add_argument("--analyst", action=argparse.BooleanOptionalAction, default=False,
                         help="Background Qwen error analyst alongside researcher and reviewer (extra API calls)")
     args = parser.parse_args()
