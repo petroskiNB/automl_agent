@@ -3,7 +3,8 @@
 Версия разработана на обновлённой базе с тремя исследовательскими направлениями,
 очередью двух обучающих процессов, nested OOF-классификацией и явным выбором
 финального pipeline. Обычный `solution.py` остаётся точкой входа прежней версии.
-Реальные CSV и журналы старых запусков в этой копии репозитория отсутствуют.
+Актуальные команды объединённого проекта: [COMBINED_AGENT.md](../COMBINED_AGENT.md).
+Результаты старого синтетического теста не являются оценкой реальной классификации.
 
 ## Модели и данные
 
@@ -29,7 +30,7 @@
 ## Установка
 
 Python 3.12 и зависимости из `requirements.txt`, в том числе torch 2.5.1.
-Для локальной проверки подготовлено отдельное `.venv-torch`.
+Для локальной проверки подготовлено отдельное `.venv`.
 Это окружение не включается в ZIP. Установка не выполняется внутри агента.
 
 ## Запуск трёх исследователей
@@ -37,7 +38,7 @@ Python 3.12 и зависимости из `requirements.txt`, в том чис�
 Из корня репозитория (пути CSV ищутся относительно исходного task.md):
 
 ```powershell
-.\.venv-torch\Scripts\python.exe solution_torch.py tasks\classification\task.md --researchers 3 --training-jobs 2 --threads 8 --analyst --output-dir outputs\pytorch_classification_v1
+.\.venv\Scripts\python.exe run_neural.py agent tasks\classification\task.md --researchers 3 --training-jobs 2 --threads 8 --analyst --output-dir outputs\pytorch_classification_v1
 ```
 
 `--threads 8` - суммарная квота этого запуска, а не квота каждого агента.
@@ -72,8 +73,8 @@ diagnostics доступны. Старый temporal suite истории ост�
 ## Сравнение без Qwen/API
 
 ```powershell
-.\.venv-torch\Scripts\python.exe benchmark_torch.py tasks\regression\task.md --target site_eui --task-type regression --metric rmse --split time --split-column Year_Factor --folds 3 --seeds 42 43 --threads 8 --output-dir outputs\torch_regression_comparison
-.\.venv-torch\Scripts\python.exe benchmark_torch.py tasks\classification\task.md --target attack_cat --task-type classification --metric f1_macro --folds 3 --seeds 42 43 --threads 8 --output-dir outputs\torch_classification_comparison
+.\.venv\Scripts\python.exe run_neural.py benchmark tasks\regression\task.md --target site_eui --task-type regression --metric rmse --split time --split-column Year_Factor --folds 3 --seeds 42 43 --threads 8 --output-dir outputs\torch_regression_comparison
+.\.venv\Scripts\python.exe run_neural.py benchmark tasks\classification\task.md --target attack_cat --task-type classification --metric f1_macro --folds 3 --seeds 42 43 --threads 8 --output-dir outputs\torch_classification_comparison
 ```
 
 Одинаковые фолды/seed и time cap на опыт для CatBoost, LightGBM, XGBoost,
@@ -103,8 +104,8 @@ Standalone benchmark предназначен для разработки: early
 Синтетическая проверка без исходных датасетов:
 
 ```powershell
-.\.venv-torch\Scripts\python.exe -m unittest -v test_torch_backend
-.\.venv-torch\Scripts\python.exe benchmark_torch.py --smoke regression --split time --split-column period --folds 2 --seeds 42 43 --epochs 30 --trees 60 --width 64 --threads 2 --time-budget 600 --final-reserve 60 --model-seconds 60 --output-dir outputs\torch_smoke_regression
+.\.venv\Scripts\python.exe run_neural.py test -v
+.\.venv\Scripts\python.exe run_neural.py benchmark --smoke regression --split time --split-column period --folds 2 --seeds 42 43 --epochs 30 --trees 60 --width 64 --threads 2 --time-budget 600 --final-reserve 60 --model-seconds 60 --output-dir outputs\torch_smoke_regression
 ```
 
 Синтетические scores проверяют работоспособность, а не качество на Альфа-Хаке.
@@ -114,7 +115,7 @@ LLM-интеграция проверяется с mock API; запросы с �
 ## Архив для платформы
 
 ```powershell
-.\.venv-torch\Scripts\python.exe build_torch_submission.py --output outputs\automl_pytorch_v1.zip
+.\.venv\Scripts\python.exe run_neural.py build --output outputs\automl_pytorch_v1.zip
 ```
 
 ZIP содержит только разрешённый список исходников и requirements, без данных,

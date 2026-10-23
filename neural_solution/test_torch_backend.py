@@ -1,4 +1,13 @@
 """Meaningful leakage, persistence, deadline, parallel and nested-validation checks."""
+# Source checkout delegates to the complete, versioned runtime.
+if __name__ == "__main__":
+    import sys as _sys
+    from pathlib import Path as _Path
+    if not _Path(__file__).with_name("solution.py").exists():
+        from runtime import main as _launch
+        _sys.argv.insert(1, 'test')
+        _launch()
+
 import json
 import os
 import subprocess
@@ -193,7 +202,7 @@ class TorchTests(unittest.TestCase):
         worker = TorchResearch(run/"research", self.files, self.task.parent)
         worker.configure("target", "regression", "rmse")
         worker.train("baseline", {"iterations": 5, "depth": 2}, "catboost")
-        names = ("run_research", "run_python", "fingerprint", "compatible_manifest", "TOOLS", "SYSTEM_PROMPT")
+        names = ("run_research", "run_python", "fingerprint", "compatible_manifest", "TOOLS", "SYSTEM_PROMPT", "research_requirements")
         originals = {name: getattr(solution, name) for name in names}
         original_batch = parallel_research.run_batch
         try:

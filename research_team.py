@@ -11,8 +11,21 @@ class ResearchTeamUnavailable(RuntimeError):
         super().__init__('; '.join(f["role"] + ': ' + f["type"] for f in failures))
 
 
+class EmptyResearchResponse(RuntimeError):
+    """An empty/truncated API response is not a research completion signal."""
+
+
+def validate_response(response):
+    choice = response.choices[0] if response.choices else None
+    message = choice.message if choice else None
+    if message is None or (not message.tool_calls and
+                           (not (message.content or '').strip() or getattr(choice, 'finish_reason', None) == 'length')):
+        raise EmptyResearchResponse('Empty or truncated response without a tool call')
+    return message
+
+
 def transient_error(error):
-    return (type(error).__name__ in {'APITimeoutError', 'APIConnectionError', 'TimeoutError',
+    return (type(error).__name__ in {'EmptyResearchResponse', 'APITimeoutError', 'APIConnectionError', 'TimeoutError',
                                     'InternalServerError', 'RateLimitError'}
             or getattr(error, 'status_code', None) in {408, 429, 500, 502, 503, 504})
 
@@ -65,7 +78,7 @@ def propose_round(client, pool, model, system, task, guidance, snapshot, recent,
             response = client.chat.completions.create(model=model, messages=messages, tools=role_tools,
                 parallel_tool_calls=False, timeout=min(180 if sequential else 90, left), max_tokens=8000)
         usage_callback(response, log_dir, "researcher_" + role)
-        return response.choices[0].message
+        return validate_response(response)
     futures = {role: pool.submit(request, role) for role in roles}
     calls, comments, seen = [], [], set()
     failures = []
@@ -92,6 +105,6 @@ def propose_round(client, pool, model, system, task, guidance, snapshot, recent,
     with (log_dir / "research_team.jsonl").open("a", encoding="utf-8") as stream:
         stream.write(json.dumps(dict(round=round_id, comments=comments, failures=failures, sequential=sequential,
             queue=[dict(id=c.id, action=c.function.name, arguments=c.function.arguments) for c in calls]), ensure_ascii=False) + "\n")
-    if len(failures) == len(roles):
+    if len(failures) == len(roles) or (failures and not calls):
         raise ResearchTeamUnavailable(failures)
     return TeamMessage("\n".join(comments), calls)

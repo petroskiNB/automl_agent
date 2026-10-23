@@ -78,9 +78,19 @@ class TeamTests(unittest.TestCase):
         client.chat.completions.create.side_effect = create
         root = Path(__file__).resolve().parent / "work"
         with tempfile.TemporaryDirectory(dir=root) as folder, ThreadPoolExecutor(2) as pool:
-            result = propose_round(client, pool, "qwen", "system", "task", "plan", {}, [], [],
-                                   200, 1, Path(folder), lambda *args: None)
-            self.assertIn("models: done", result.content)
+            with self.assertRaises(ResearchTeamUnavailable) as caught:
+                propose_round(client, pool, "qwen", "system", "task", "plan", {}, [], [],
+                              200, 1, Path(folder), lambda *args: None)
+            self.assertTrue(caught.exception.retryable)
+
+    def test_empty_and_truncated_responses_are_retryable(self):
+        from research_team import validate_response, EmptyResearchResponse, transient_error
+        for text, reason in [(None, 'stop'), ('  ', 'stop'), ('unfinished', 'length')]:
+            with self.assertRaises(EmptyResearchResponse) as caught:
+                validate_response(NS(choices=[NS(message=NS(content=text, tool_calls=[]), finish_reason=reason)]))
+            self.assertTrue(transient_error(caught.exception))
+        message = NS(content='Finished with measured results', tool_calls=[])
+        self.assertIs(validate_response(NS(choices=[NS(message=message, finish_reason='stop')])), message)
 
 
 if __name__ == "__main__":

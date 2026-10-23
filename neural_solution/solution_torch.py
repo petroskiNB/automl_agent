@@ -1,4 +1,13 @@
 """Isolated PyTorch version of the Qwen agent. See PYTORCH_README.md."""
+# Source checkout delegates to the complete, versioned runtime.
+if __name__ == "__main__":
+    import sys as _sys
+    from pathlib import Path as _Path
+    if not _Path(__file__).with_name("solution.py").exists():
+        from runtime import main as _launch
+        _sys.argv.insert(1, 'agent')
+        _launch()
+
 import argparse
 import copy
 import hashlib
@@ -106,11 +115,29 @@ def run_worker(action, arguments, folder, files, log_dir, step, timeout, module_
         solution.run_python = original
 
 
+def neural_requirements(state):
+    experiments = [e for e in state.get("experiments", [])
+                   if e.get("algorithm") in {"torch_mlp", "torch_resnet"} and not e.get("timed_out")]
+    pending = []
+    if not any(e["algorithm"] == "torch_mlp" for e in experiments):
+        pending.append("Обучить компактную torch_mlp")
+    if not any(e["algorithm"] == "torch_resnet" for e in experiments):
+        pending.append("Обучить компактную torch_resnet")
+    if state.get("task_type") == "classification":
+        for weight in (None, "SqrtBalanced"):
+            if not any(e["algorithm"] == "torch_mlp" and e.get("params", {}).get("auto_class_weights") == weight for e in experiments):
+                pending.append(f"Проверить MLP: auto_class_weights={weight}")
+    if not any(e.get("feature_code", "").strip() for e in experiments):
+        pending.append("Проверить нейросеть с явно заданными преобразованиями признаков")
+    return pending
+
+
 def install_hooks():
     solution = controller()
     if getattr(solution, "_torch_hooks", False):
         return
     solution._torch_hooks = True
+    solution.research_requirements = neural_requirements
     solution.run_research_original = solution.run_research
     solution.run_research = run_worker
     solution.run_python = limited_run_python
@@ -122,6 +149,7 @@ def install_hooks():
                      "final_output.py", "parallel_research.py", "research_team.py"):
             result[name] = sha256(ROOT/name)
         result["cpu_threads"] = str(configure())
+        result["controller_code"] = sha256(Path(solution.__file__))
         return result
     solution.fingerprint = fingerprint
     solution.compatible_manifest = lambda saved, current, state: saved == current
@@ -143,6 +171,17 @@ def install_hooks():
         "target_transform": {"type": "string", "enum": ["standard", "log1p"]}})
     solution.SYSTEM_PROMPT += """
 Экспериментальная версия PyTorch. Дополнительные алгоритмы: torch_mlp и torch_resnet.
+В снимке pending_experiments — обязательный список проверок до добровольного завершения.
+Models выполняет MLP и residual MLP, rare — MLP без весов/SqrtBalanced,
+features — нейросеть с преобразованиями по словарю. Сначала согласуйте рецепты
+по общей истории; один опыт может закрыть несколько пунктов списка.
+Список не отменяет лимит времени и финализацию сохранённого запасного результата.
+Общий поиск объединяет бустинги, MLP и их ансамбли. В режиме трёх исследователей:
+features развивает признаки и бустинговый baseline; models сравнивает архитектуры,
+запускает OOF и выбирает финал; rare проверяет веса классов и ошибки сети/бустинга.
+Не запускайте одну и ту же нейросеть всеми направлениями. Перед новым обучением
+проверяйте общую историю. На независимых внешних фолдах сравнивайте также одиночный
+бустинг: наличие сети не означает, что её обязательно нужно включить в ансамбль.
 Это компактные MLP с embeddings категорий; torch_resnet содержит residual-блоки, это НЕ TabM.
 После быстрого бустингового baseline обязательно сравни torch_mlp (iterations=80,
 width=256, layers=3, batch_size=512, learning_rate=0.001, dropout=0.1,

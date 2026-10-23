@@ -1,4 +1,13 @@
 """Budgeted, offline, same-split comparison; no LLM calls. --smoke uses synthetic data."""
+# Source checkout delegates to the complete, versioned runtime.
+if __name__ == "__main__":
+    import sys as _sys
+    from pathlib import Path as _Path
+    if not _Path(__file__).with_name("solution.py").exists():
+        from runtime import main as _launch
+        _sys.argv.insert(1, 'benchmark')
+        _launch()
+
 import argparse
 import json
 import os
