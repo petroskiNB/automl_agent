@@ -1,5 +1,7 @@
 .venv/
 .venv-torch/
+.venv_autogluon/
+.venv_lightautoml/
 .env
 __pycache__/
 tasks/

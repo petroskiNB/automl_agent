@@ -1,0 +1,73 @@
+{
+  "updated_date": "2026-10-25",
+  "source": "User relayed organizer execution confirmation and platform scores",
+  "detailed_organizer_logs_available": false,
+  "submissions": [
+    {
+      "archive": "automl_pytorch_v1.zip",
+      "sha256": "1037abe7e4ce462e780581cfee000aad1b620dcba2d0807b4c72e5cf4134fcfc",
+      "platform_score": 1862.567,
+      "score_exact": true,
+      "classification": "success",
+      "regression": "success",
+      "role": "previous_control"
+    },
+    {
+      "archive": "automl_submission_v5_20261023.zip",
+      "sha256": "8769f8dec864def9f4b3d48f119b929ac124ee854c74d773f9cb7dedd2f48cef",
+      "platform_score": null,
+      "classification": "success",
+      "regression": "success",
+      "role": "previous_line",
+      "note": "Exact score for this archive not separately verified in this record."
+    },
+    {
+      "archive": "automl_pytorch_ple_v2.zip",
+      "platform_score": 750,
+      "score_exact": false,
+      "classification": "unknown",
+      "regression": "unknown",
+      "role": "separate_experiment",
+      "note": "Approximate score reported by user; task completion not separately confirmed."
+    },
+    {
+      "archive": "automl_champion_v5_search_20261024.zip",
+      "sha256": "3f8aa9b4cc3be9ae26975444fdbbae3dfd0c82ed1d07f8a9ff1bd4479e6c73f1",
+      "platform_score": 0,
+      "score_exact": true,
+      "classification": "FileNotFoundError before training and LLM",
+      "regression": "FileNotFoundError before training and LLM",
+      "role": "experimental_v5",
+      "organizer_diagnosis": "Only root .py files and requirements.txt are transferred. A required .json file was unavailable.",
+      "identified_dependency": "reference_recipes.json (fingerprint and recipe loader)",
+      "fix": "v5.1 embeds unchanged recipes in reference_recipes.py and checks filtered startup for both tasks."
+    },
+    {
+      "archive": "automl_champion_v5_1_platformfix_20261024.zip",
+      "sha256": "dd9b2a998951d2524fbe55c9214943bd7bd01c9b86b72ce2372adcff8acff9a2",
+      "platform_score": 2157.225,
+      "score_exact": true,
+      "classification": "individual logs requested",
+      "regression": "individual logs requested",
+      "role": "control",
+      "control_metadata": "controls/champion_v5_1_2157_225.json",
+      "duration_seconds_user_reported": 3296.0,
+      "note": "Score and best-solution status confirmed by user screenshot. Per-task metrics not available."
+    },
+    {
+      "archive": "automl_champion_v6_1_exportfix_20261024.zip",
+      "sha256": "a5c93509d25c34fc982eb6d52e3061c96e0da9d7b7f33e798c03c598d0304fee",
+      "platform_score": 2015.267,
+      "score_exact": true,
+      "classification": "individual task logs not available",
+      "regression": "individual task logs not available",
+      "role": "experimental_v6_1",
+      "duration_seconds_user_reported": 6707.7,
+      "platform_status_user_reported": "successful",
+      "reported_date": "2026-10-25",
+      "difference_from_control": -141.958,
+      "note": "Aggregate screenshot only. Do not attribute score decrease to either task or AutoGluon without per-task evidence."
+    }
+  ],
+  "active_control": "controls/champion_v5_1_2157_225.json"
+}

@@ -1,0 +1,51 @@
+{
+  "checked_date": "2026-10-24",
+  "status": "passed",
+  "autogluon_version": "1.3.1",
+  "environment": ".venv_autogluon",
+  "primary_environment_unchanged": true,
+  "check_script": "check_autogluon.py",
+  "report": "outputs/autogluon_connection_20261024/check_result.json",
+  "data": "synthetic only; 450 train and 150 untouched outer rows",
+  "models": [
+    "LightGBM_BAG_L1",
+    "CatBoost_BAG_L1",
+    "XGBoost_BAG_L1",
+    "WeightedEnsemble_L2"
+  ],
+  "bagging_folds": 3,
+  "threads": 2,
+  "gpu_count": 0,
+  "elapsed_seconds": 14.802,
+  "save_load_predictions_equal": true,
+  "integrated_into_qwen_agent": true,
+  "current_control": "controls/champion_v5_1_2157_225.json",
+  "next_step": "Submit v6.1 with automatic classification selection and platform AutoGluon defaults; aggregate quality still needs a platform measurement.",
+  "tool": "run_autogluon_suite",
+  "opt_in_flag": "--autogluon-budget 3600",
+  "supported_task": "classification/f1_macro; random stratified split only",
+  "verification": {
+    "fake_predictor_boundary_export_tests": 3,
+    "filtered_platform_startup": [
+      "regression disabled",
+      "classification disabled",
+      "classification enabled"
+    ],
+    "live_qwen_test": true
+  },
+  "live_classification_run": {
+    "run": "outputs\\champion_classification_v6_autogluon\\agent_runs\\20261024_222412_650381",
+    "reference_mean_f1": 0.6128242563436456,
+    "autogluon_mean_f1": 0.5938922016059542,
+    "ensemble_macro_decision_mean_f1": 0.6297645458086643,
+    "original_export": "legacy XGBoost after APIConnectionError",
+    "recovered_export": {
+      "kind": "autogluon_oof",
+      "suite_id": "46b77a63977399d4",
+      "candidate": "macro_decision",
+      "note": "Explicit switch of validation track; not a numeric comparison with legacy holdout score"
+    },
+    "recovery_metadata": "outputs\\champion_classification_v6_autogluon\\agent_runs\\20261024_222412_650381\\recovery_export.json",
+    "rows": 41166
+  }
+}

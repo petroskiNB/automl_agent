@@ -1,0 +1,87 @@
+{
+  "python": "3.12.10",
+  "executable": "C:\\Users\\nikpe\\Desktop\\automl_agent\\.venv_lightautoml\\Scripts\\python.exe",
+  "expected_lightautoml": "0.4.2",
+  "lightautoml": "0.4.2",
+  "versions": {
+    "numpy": "1.26.4",
+    "scipy": "1.12.0",
+    "pandas": "2.2.3",
+    "scikit-learn": "1.5.2",
+    "lightgbm": "4.6.0",
+    "catboost": "1.2.8",
+    "xgboost": "2.1.4",
+    "torch": "2.5.1",
+    "optuna": "4.2.1",
+    "statsmodels": "0.14.0",
+    "joblib": "1.4.2",
+    "threadpoolctl": "3.6.0",
+    "autowoe": "1.4.0",
+    "holidays": "0.107",
+    "json2html": "1.3.0",
+    "networkx": "3.7",
+    "cmaes": "0.13.1",
+    "SQLAlchemy": "2.1.6",
+    "tabm": "0.0.3",
+    "tabicl": "2.2.0",
+    "poetry-core": "1.9.1"
+  },
+  "training_performed": false,
+  "llm_api_used": false,
+  "metadata_only": false,
+  "preset_imported": true,
+  "regression_task_created": true,
+  "supported_fit_arguments": [
+    "cv_iter",
+    "path_to_save",
+    "roles",
+    "train_data",
+    "valid_data"
+  ],
+  "candidate_constructed": true,
+  "candidate_parameters": {
+    "timeout": 57,
+    "cpu_limit": 8,
+    "gpu_ids": null,
+    "debug": true,
+    "general_params": {
+      "use_algos": [
+        [
+          "linear_l2",
+          "lgb",
+          "cb"
+        ]
+      ],
+      "nested_cv": false,
+      "return_all_predictions": false
+    },
+    "reader_params": {
+      "cv": 2,
+      "random_state": 42,
+      "n_jobs": 8,
+      "advanced_roles": false
+    },
+    "nested_cv_params": {
+      "cv": 1
+    },
+    "selection_params": {
+      "mode": 0
+    },
+    "timing_params": {
+      "mode": 2,
+      "tuning_rate": 0
+    },
+    "lgb_params": {
+      "default_params": {
+        "num_threads": 8
+      }
+    },
+    "cb_params": {
+      "default_params": {
+        "task_type": "CPU",
+        "thread_count": 8
+      }
+    }
+  },
+  "status": "passed"
+}

@@ -1,0 +1,28 @@
+{
+  "report_date": "2026-10-26",
+  "timezone": "Europe/Moscow",
+  "score_source": "User platform screenshots",
+  "archives": [
+    {
+      "archive": "automl_champion_v7_anchors_ensemble_20261025.zip",
+      "platform_score": 2284.823,
+      "sha256": "f3acc41a4cd11c9fb6ea503bae06208a24cc3dd582cac4bdd9f47d1c0979ff14",
+      "bytes": 122867
+    },
+    {
+      "archive": "automl_champion_v9_extended_20261025.zip",
+      "platform_score": 316.66,
+      "sha256": "9ed59599e0aca03ebce41fe205d596a43430fe39401b7ca34b43a57cc5620150",
+      "bytes": 185234
+    }
+  ],
+  "v9_displayed_status": "Успешно",
+  "v9_displayed_duration_seconds": 11597.0,
+  "detailed_platform_logs_available": false,
+  "platform_failure_cause": "unknown; hypotheses only",
+  "recovered_classification_mean_macro_f1": 0.6328643035640938,
+  "recovered_classification_worst_macro_f1": 0.628904641640616,
+  "recovered_classification_oof_macro_f1": 0.6325864623456224,
+  "xgboost_exp5_recheck_mean_macro_f1": 0.6128242563436456,
+  "report_markdown_sha256": "f4ee9f8400731b1f304c60e156304efdb56213ee50c92febf79e7c35b9b4997c"
+}

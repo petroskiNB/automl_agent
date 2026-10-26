@@ -1,0 +1,41 @@
+{
+  "name": "pytorch_v1_control",
+  "platform_score_user_reported": 1862.567,
+  "registered_date": "2026-10-24",
+  "archive": "outputs/control/automl_pytorch_v1_score1862_567.zip",
+  "sha256": "1037abe7e4ce462e780581cfee000aad1b620dcba2d0807b4c72e5cf4134fcfc",
+  "source_archive": "D:\\Downloads\\automl_pytorch_v1.zip",
+  "files_sha256": {
+    "solution.py": "d5311a6de3434a0a17daed946722142880979897ea5c3752324596a1a62ff3a1",
+    "legacy_solution.py": "e23484409610194ebc16f0e7c727c6c806f8be84267141acf6c69a34c0229c30",
+    "solution_torch.py": "7fe038add5b00e4922c8a34886132c808d591abbf7c46e3c5434da14815cf334",
+    "torch_resources.py": "80c57cd74da06447ca7a9cea5a739bbc4b5edc768fe41cb50c25e933d9de5a4b",
+    "torch_model.py": "bdcdc5aaea508e9c1a74c5c14d22a43132b32a1e5618a9a02121517b7effea9f",
+    "torch_backend.py": "78fea44a81cacb70d168d922f93eef322e3cdaee0b43362c40e3407c2fc6c016",
+    "torch_suites.py": "b4b1cceaa5f105469679b24794c4bbc66ce16696bd26aca4487e7e1cc7642513",
+    "research.py": "63b6ecf467bb816f3d45d07ca7852a5c968ae23b4e06aea70f541b00a67b9af8",
+    "xgb_backend.py": "e75259b6cfc731bd1794a80813f4623c44acea89d0e4ad709bb06bcdda3783e5",
+    "diagnostics.py": "85aab72da094344fb01ebf98f2eb75271d298da2d955ce9b4d4c8d337b3448b9",
+    "temporal_research.py": "4e34df5539529b020e8dae0f80ee032a7f8a21569257cab28a14560be8332e1b",
+    "classification_research.py": "c9283ac60d21ac0a8c478645b488dbb2d832591458effc2d4924ec85166403ff",
+    "classification_checks.py": "4e41804c02c3418d5169c659c03742fb152aaeafc4e85cf16ee8c665884092c0",
+    "final_output.py": "6bea53d2e00af6dc7bb4d4013e10655bda046495e8e26b407716a2506bca80e6",
+    "parallel_research.py": "14be51a2b0c8302765b39ef38bc2efb3f053298a05ebfad37666a8a7fec0228a",
+    "research_team.py": "5e035593936eeaec7634e83ba0507560cf28ab8f06545a25277e91f8ecf62bb9",
+    "requirements.txt": "9cd70e02571cd05a7e3afbfa502110d023c1ce1bf146f29a13494a3ec5470ff0"
+  },
+  "defaults": {
+    "threads": 8,
+    "researchers": 1,
+    "training_jobs": 1,
+    "reviewer": true,
+    "analyst": false,
+    "time_budget": 9900
+  },
+  "defaults_note": "Archive defaults only; actual platform overrides unknown. Organizers will not provide detailed logs.",
+  "execution_user_reported": {
+    "classification": "success",
+    "regression": "success"
+  },
+  "organizer_detailed_logs_available": false
+}

@@ -1,0 +1,106 @@
+{
+  "date": "2026-10-25",
+  "flaml_version": "2.3.6",
+  "environment": ".venv",
+  "installed_distributions": [
+    "FLAML==2.3.6"
+  ],
+  "integration": "temporal regression RMSE opt-in; same outer rows, inner past-only search, fixed-record refit, temporal ensemble and export",
+  "default_flaml_budget": 0,
+  "recommended_first_budget": 1800,
+  "total_agent_budget": 9900,
+  "tests": {
+    "focused_no_training_checks": 6,
+    "seconds": 8.483,
+    "platform_startup": "mocked first LLM; FLAML opt-in and existing default task routing passed"
+  },
+  "synthetic_runtime_check": {
+    "status": "passed",
+    "version": "2.3.6",
+    "inner_rows": 180,
+    "inner_validation_rows": 60,
+    "outer_train_rows": 240,
+    "final_train_rows": 300,
+    "selected": {
+      "record_id": 17,
+      "learner": "rf",
+      "config": {
+        "n_estimators": 26,
+        "max_features": 1.0,
+        "max_leaves": 7
+      },
+      "inner_rmse": 0.3334150449705841
+    },
+    "reload_matches": true,
+    "future_predictions": [
+      10.024549919231372,
+      12.079132087636124
+    ],
+    "elapsed_seconds": 14.547,
+    "note": "Synthetic compatibility check only; no Qwen and no hackathon training data"
+  },
+  "quality_on_hackathon_data": "First local Qwen run completed; standalone FLAML lost to the paired reference; active control unchanged.",
+  "active_control_sha256": "dd9b2a998951d2524fbe55c9214943bd7bd01c9b86b72ce2372adcff8acff9a2",
+  "module_sha256": "c7ddf3f3f10366f9f8bf21d1dab1d2e8f3a269eaa7d200ee3247fc4416e742f8",
+  "launch_instructions": "FLAML.md",
+  "local_qwen_run": {
+    "path": "outputs/champion_regression_flaml_v1/agent_runs/20261025_151651_496164",
+    "status": "completed",
+    "elapsed_seconds": 3494.282,
+    "selected": {
+      "kind": "temporal",
+      "suite_id": "158517922e2f6a24",
+      "candidate": "reference",
+      "note": "Explicit switch of validation track; not a numeric comparison with legacy holdout score"
+    },
+    "published": true,
+    "flaml_charged_seconds": 1475,
+    "metrics": [
+      {
+        "mode": "reference",
+        "mean_rmse": 40.70177475754286,
+        "latest_rmse": 34.51227437571418,
+        "worst_rmse": 52.37795384031072
+      },
+      {
+        "mode": "flaml",
+        "mean_rmse": 42.200416674048505,
+        "latest_rmse": 36.89223881150364,
+        "worst_rmse": 57.16985743579875
+      }
+    ],
+    "diagnostic": [
+      {
+        "candidate": "reference",
+        "mean_rmse": 40.70177475754286,
+        "latest_rmse": 34.51227437571418,
+        "worst_rmse": 52.37795384031072
+      },
+      {
+        "candidate": "flaml",
+        "mean_rmse": 42.200416674048505,
+        "latest_rmse": 36.89223881150364,
+        "worst_rmse": 57.16985743579875
+      },
+      {
+        "candidate": "equal_reference_flaml",
+        "mean_rmse": 40.52956685168381,
+        "latest_rmse": 35.24217565708206,
+        "worst_rmse": 53.441043279614505
+      },
+      {
+        "candidate": "previous_control_ensemble",
+        "mean_rmse": 39.92740402784606,
+        "latest_rmse": 36.30922779982932,
+        "worst_rmse": 50.49723230742099
+      },
+      {
+        "candidate": "equal_previous_control_flaml",
+        "mean_rmse": 40.342873232455595,
+        "latest_rmse": 36.34576705802189,
+        "worst_rmse": 52.602211693419015
+      }
+    ],
+    "note": "Cached equal-weight blends are retrospective diagnostics only; not registered/exported pipelines or evidence of hidden-test gain."
+  }
+}
